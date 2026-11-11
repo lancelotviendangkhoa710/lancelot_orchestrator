@@ -1,0 +1,77 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ninerouter/claude-sonnet-4-6",
+  "providers": {
+    "ninerouter": {
+      "name": "9Router",
+      "env": [
+        "NINEROUTER_API_KEY"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://127.0.0.1:20128/v1",
+        "encoding": "none"
+      },
+      "models": {
+        "claude-sonnet-4-6": {
+          "name": "Sonnet 4.6 ",
+          "modelID": "ag/claude-sonnet-4-6",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "claude-opus-4-6-thinking": {
+          "name": "Opus 4.6",
+          "modelID": "ag/claude-opus-4-6-thinking",
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        }
+      }
+    }
+  },
+  "mcp": {
+    "servers": {
+      "playwright": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@playwright/mcp@0.0.85",
+          "--headless",
+          "--isolated",
+          "--browser",
+          "msedge",
+          "--caps",
+          "devtools",
+          "--console-level",
+          "error"
+        ],
+        "timeout": {
+          "startup": 60000,
+          "execution": 120000
+        }
+      }
+    }
+  }
+}
