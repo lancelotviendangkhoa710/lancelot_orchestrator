@@ -35,7 +35,7 @@ Use `Invoke-KhoaWorker.ps1` to dispatch a bounded task. Provide a JSON contract 
 
 The runner creates a branch and worktree under ignored `runs/`, records logs and metadata, checks changed paths against `allowed_paths`, and commits in-scope changes. A scope violation or model quota failure preserves the worktree for review. To try the other configured model once after a quota error, pass `-AllowModelFallback`; fallback occurs only when the worktree has no changes. Review the result before integration.
 
-To integrate reviewed worker results, pass their `result.json` files to `Invoke-KhoaIntegration.ps1` in dependency order. It creates a separate integration branch/worktree, cherry-picks sequentially, and runs the provided checks. It never updates `main`.
+To integrate reviewed worker results, pass their `result.json` files to `Invoke-KhoaIntegration.ps1` in dependency order and provide at least one check. Checks must throw on failure or return a failing exit code; a Boolean `False` is treated as failure. The controller verifies each result came from a contract-enforced task, that its commit still matches, and that committed paths match the recorded allowlist. It creates a separate integration branch/worktree, cherry-picks sequentially, and resets that disposable worktree to its initial SHA if integration fails. It never updates `main`.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for isolation, planning, recovery, and quality gate design. Git worktrees separate code changes but do not provide an OS security boundary. OpenCode worker configuration denies shell and MCP access; use a separate OS or container boundary for untrusted tasks.
 

@@ -4,6 +4,7 @@ $package = Join-Path $scratch 'package'
 $repo = Join-Path $scratch 'repo'
 New-Item -ItemType Directory -Path $package, $repo -Force | Out-Null
 Copy-Item (Join-Path $PSScriptRoot '..\Invoke-KhoaWorker.ps1') $package
+Copy-Item (Join-Path $PSScriptRoot '..\Invoke-KhoaIntegration.ps1') $package
 Copy-Item (Join-Path $PSScriptRoot '..\opencode.jsonc') $package
 Set-Content (Join-Path $package '.env') 'NINEROUTER_API_KEY=test-only-key'
 & git -C $repo init -q
@@ -53,5 +54,19 @@ try {
     $fallback = @($allResults | ForEach-Object { Get-Content $_.FullName -Raw | ConvertFrom-Json } | Where-Object { $_.attempts.Count -eq 2 })
     if ($fallback.Count -ne 1 -or $fallback[0].status -ne 'completed' -or -not $fallback[0].attempts[0].quota_exhausted) { throw 'Quota fallback check failed.' }
     Write-Output 'quota detection and clean-worktree fallback: passed'
+
+    $integration = Join-Path $package 'Invoke-KhoaIntegration.ps1'
+    $resultPath = Get-ChildItem (Join-Path $package 'runs') -Filter result.json -Recurse | ForEach-Object FullName | Select-Object -Last 1
+    try { & $integration -RepoPath $repo -WorkerResults $resultPath *> $null; throw 'Expected empty-check rejection' }
+    catch { if ($_.Exception.Message -notmatch 'At least one integration check') { throw } }
+    & $integration -RepoPath $repo -WorkerResults $resultPath -Checks @('Test-Path allowed.md') *> $null
+    $integrationReport = Get-ChildItem (Join-Path $package 'runs') -Filter integration.json -Recurse | Select-Object -Last 1 | Get-Content -Raw | ConvertFrom-Json
+    if ($integrationReport.status -ne 'passed') { throw 'Valid integration check did not pass.' }
+    $beforeFail = $integrationReport.integration_commit
+    try { & $integration -RepoPath $repo -WorkerResults $resultPath -Checks @('Test-Path missing.md') *> $null; throw 'Expected false check rejection' }
+    catch { if ($_.Exception.Message -notmatch 'Integration check failed') { throw } }
+    $failedReport = Get-ChildItem (Join-Path $package 'runs') -Filter integration.json -Recurse | Select-Object -Last 1 | Get-Content -Raw | ConvertFrom-Json
+    if ($failedReport.status -ne 'failed' -or $failedReport.rollback_commit -ne $fallback[0].base_commit -or $failedReport.rollback_exit_code -ne 0) { throw 'False check or rollback validation failed.' }
+    Write-Output 'integration required checks, false assertion and rollback: passed'
 }
 finally { Remove-Item Function:opencode -ErrorAction SilentlyContinue; Remove-Variable quotaAttempt -Scope Global -ErrorAction SilentlyContinue }

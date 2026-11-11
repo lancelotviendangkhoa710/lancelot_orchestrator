@@ -23,7 +23,11 @@ if ($ContractPath) {
     foreach ($field in @('objective','context','allowed_paths','forbidden_actions','implementation_requirements','acceptance_criteria')) {
         if (-not $contract.PSObject.Properties[$field] -or -not $contract.$field) { throw "Task contract requires $field." }
     }
-    if (@($contract.allowed_paths).Count -eq 0) { throw 'allowed_paths must be nonempty.' }
+    foreach ($field in @('allowed_paths','forbidden_actions','implementation_requirements','acceptance_criteria')) {
+        if ($contract.$field -isnot [array] -or @($contract.$field).Count -eq 0) { throw "$field must be a nonempty array." }
+    }
+    if ($contract.timeout_seconds -and ($contract.timeout_seconds -lt 30 -or $contract.timeout_seconds -gt 90)) { throw 'timeout_seconds must be between 30 and 90.' }
+    if ($contract.retry_limit -and ($contract.retry_limit -lt 0 -or $contract.retry_limit -gt 2)) { throw 'retry_limit must be between 0 and 2.' }
     foreach ($path in @($contract.allowed_paths)) {
         if ([IO.Path]::IsPathRooted([string]$path) -or ([string]$path -match '(^|[\\/])\.\.([\\/]|$)')) { throw "Unsafe allowed path: $path" }
     }
@@ -66,6 +70,8 @@ $meta = [ordered]@{
     run_id = $runId
     repo = $gitRoot
     base_commit = (& git -C $gitRoot rev-parse HEAD).Trim()
+    contract_enforced = [bool]$contract
+    allowed_paths = if ($contract) { @($contract.allowed_paths) } else { @() }
     model = $Model
     worktree = $worktree
     branch = $branch
