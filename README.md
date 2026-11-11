@@ -4,6 +4,8 @@
 
 Lancelot Orchestrator coordinates Codex as the Master, OpenCode coding workers through 9Router, and a GPT-6 Luna testing role. Workers implement bounded tasks in separate Git worktrees. The Master reviews every diff and controls integration; changes are never merged automatically into `main`.
 
+**Current safety status:** This is a prototype. Worktrees and OpenCode permissions do not sandbox a worker from the host. The Testing Agent is an instruction prompt rather than an automatically dispatched, validated gate. Do not run unattended workers against valuable repositories until the isolation and recovery gates in [HARDENING_PLAN.md](HARDENING_PLAN.md) have passed.
+
 ## Requirements
 
 - Windows PowerShell, Git, OpenCode CLI, and Codex CLI.
@@ -23,6 +25,12 @@ Lancelot Orchestrator coordinates Codex as the Master, OpenCode coding workers t
    Start a new Codex session in that project to load the installed skill.
 
 ## Coding workflow
+
+Before dispatching multiple contracts, inspect a conservative dependency and
+resource plan with `./Get-KhoaTaskPlan.ps1 -ContractPaths @('.\a.json','.\b.json')`.
+The planner groups at most two independent tasks per wave and serializes
+overlapping scopes or `resource_locks`. It does not dispatch or lock processes;
+the Master must still control execution.
 
 Use `Invoke-KhoaWorker.ps1` to dispatch a bounded task. Provide a JSON contract based on [`schemas/task-contract.schema.json`](schemas/task-contract.schema.json):
 
@@ -59,8 +67,13 @@ Configure Supabase MCP only in repositories that use Supabase. For Edge Function
 
 ## Smoke test
 
-Run the worker dispatch, scope enforcement, permission, report, and quota fallback smoke checks with:
+Run the isolated worker, integration, and Compose policy checks with:
 
 ```powershell
 ./tests/worker-smoke.ps1
+./tests/worker-hardening.ps1
+./tests/compose-policy.ps1
+./tests/task-plan.ps1
+./tests/integration-lock.ps1
+./tests/recovery-scan.ps1
 ```

@@ -13,13 +13,16 @@ param(
     [ValidateRange(30, 3600)]
     [int] $TimeoutSeconds = 300,
 
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$')]
     [string] $RunId = ([guid]::NewGuid().ToString('N').Substring(0, 10))
 )
 
 $ErrorActionPreference = 'Stop'
 function Test-PathUnderRoot([string] $Path, [string] $Root) {
-    $relative = [IO.Path]::GetRelativePath($Root, [IO.Path]::GetFullPath($Path))
-    return (-not [IO.Path]::IsPathRooted($relative)) -and $relative -ne '..' -and -not $relative.StartsWith("..$([IO.Path]::DirectorySeparatorChar)", [StringComparison]::Ordinal)
+    $fullRoot = [IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    return $fullPath.Equals($fullRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        $fullPath.StartsWith($fullRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 
 $repoRoot = (Resolve-Path -LiteralPath $RepoPath).Path
@@ -28,7 +31,7 @@ if ($ComposeFile) {
     $composePath = (Resolve-Path -LiteralPath $candidate).Path
 }
 else {
-    $candidates = @('compose.yaml','compose.yml','docker-compose.yaml','docker-compose.yml') | ForEach-Object { Join-Path $repoRoot $_ } | Where-Object { Test-Path -LiteralPath $_ }
+    $candidates = @(@('compose.yaml','compose.yml','docker-compose.yaml','docker-compose.yml') | ForEach-Object { Join-Path $repoRoot $_ } | Where-Object { Test-Path -LiteralPath $_ })
     if ($candidates.Count -ne 1) { throw "Expected exactly one standard Compose file at repo root; found $($candidates.Count). Pass -ComposeFile explicitly." }
     $composePath = (Resolve-Path -LiteralPath $candidates[0]).Path
 }
@@ -61,7 +64,16 @@ try {
     foreach ($network in @($composeConfig.networks.PSObject.Properties | ForEach-Object Value)) {
         if ($network.external) { throw 'External Docker networks are blocked by default. Use an explicitly approved isolated test network.' }
     }
+    foreach ($secret in @($composeConfig.secrets.PSObject.Properties | ForEach-Object Value)) {
+        if ($secret.external) { throw 'External Docker secrets are blocked for test projects.' }
+    }
+    foreach ($config in @($composeConfig.configs.PSObject.Properties | ForEach-Object Value)) {
+        if ($config.external) { throw 'External Docker configs are blocked for test projects.' }
+    }
     foreach ($service in @($composeConfig.services.PSObject.Properties | ForEach-Object Value)) {
+        if ($service.privileged -or $service.network_mode -eq 'host' -or $service.pid -eq 'host' -or $service.ipc -eq 'host' -or @($service.devices).Count -gt 0) {
+            throw 'Privileged services, host namespaces, and host devices are blocked for test projects.'
+        }
         foreach ($mount in @($service.volumes | Where-Object { $_.type -eq 'bind' })) {
             $sourcePath = [IO.Path]::GetFullPath([string]$mount.source)
             if (-not (Test-PathUnderRoot $sourcePath $resolvedRepoRoot)) {

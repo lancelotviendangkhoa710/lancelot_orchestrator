@@ -4,10 +4,10 @@ This document defines the production direction for Codex → OpenCode → 9Route
 
 ## Current implementation status
 
-- The current launcher creates a task branch and Git worktree, captures OpenCode output, validates changed paths for JSON Task Contracts, and commits only in-scope results. A worktree is a version-control workspace, **not a security sandbox**.
-- The launcher currently uses a detached worktree and does not implement task DAG scheduling, path locks, a merge controller, crash recovery, or container isolation.
-- The worker prompt asks the model not to touch unrelated paths or perform dangerous actions. Those are instructions, not enforcement.
-- Docker CLI is installed in the inspected environment, but the daemon did not respond during inspection. Container isolation has not been exercised.
+- The launcher creates a task branch and Git worktree, records worker metadata and logs, enforces a process timeout, validates changed paths for JSON Task Contracts, and commits only in-scope results. A worktree is a version-control workspace, **not a security sandbox**.
+- The integration script validates worker commit provenance and path overlap, cherry-picks into a disposable worktree, runs supplied checks, and verifies rollback on failure. It does not enforce repository-owned quality gates or semantic compatibility.
+- A static task planner checks dependencies and conservatively separates overlapping scopes/resources into waves. A read-only recovery scan identifies stale runs and commit mismatch. Task DAG dispatch, path/resource locks during execution, automatic restart reconciliation, worker container integration, and an independently invoked Testing Agent are not implemented.
+- The worker prompt and OpenCode permissions restrict intended behavior, but they do not establish an OS security boundary. Docker Engine is available in the inspected environment; container isolation has not been exercised.
 
 Do not enable unattended workers against valuable project data until the isolation and integration gates below are implemented and tested.
 

@@ -1,0 +1,30 @@
+name: Local safety checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Worker and integration smoke
+        shell: powershell
+        run: .\tests\worker-smoke.ps1
+      - name: Worker timeout and scope
+        shell: powershell
+        run: .\tests\worker-hardening.ps1
+      - name: Compose policy
+        shell: powershell
+        run: .\tests\compose-policy.ps1
+      - name: Task planning
+        shell: powershell
+        run: .\tests\task-plan.ps1
+      - name: Integration lock
+        shell: powershell
+        run: .\tests\integration-lock.ps1
+      - name: Recovery scan
+        shell: powershell
+        run: .\tests\recovery-scan.ps1
